@@ -51,7 +51,7 @@ def train_vae(model, optimizer, num_epochs, train_loader, test_loader, modelname
 
         # logging losses
         train_loss.append(avg_train_loss)
-        test_loss.append(avg_train_loss)
+        test_loss.append(avg_val_loss)
         print(f'Epoch [{epoch+1}/{num_epochs}], Training Loss: {avg_train_loss.item():.4f}, Validation Loss: {avg_val_loss.item():.4f}')
 
         if avg_val_loss.item() < best_loss:
