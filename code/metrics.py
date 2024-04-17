@@ -18,7 +18,7 @@ class Metrics:
         with torch.no_grad():
             for data, target in self.data_looker.load_data():
                 data = data.to(self.device)
-                ood_scores, _ = self.model(data)  # Extract only the first output
+                ood_scores = self.model(data)  # Extract only the first output
                 self.scores.extend(ood_scores.cpu().numpy())
                 self.labels.extend(target.cpu().numpy())
         return np.array(self.labels), np.array(self.scores)
