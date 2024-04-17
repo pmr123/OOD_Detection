@@ -72,6 +72,6 @@ class Metrics:
         self.plot_metrics(thresholds, fpr_values, tpr_values)
 
 # Example Usage
-# Assuming model, data_looker, device are already defined:
+# Assuming that model, data_looker, device have already been defined
 metrics = Metrics(model, data_looker, device)
 metrics.run_metrics_evaluation()
