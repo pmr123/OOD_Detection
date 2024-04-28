@@ -45,10 +45,13 @@ class VAE(nn.Module):
         mu, logvar = torch.split(encoded, self.latent_size, dim=1)
         z = self.reparameterize(mu, logvar)
         decoded = self.decoder(z)
-        return decoded, mu, logvar
+        return decoded, mu, logvar, z
 
-
-
-# code threshold based OOD detector 
+# get trained model
+def get_trained_model(modelname):
+    model = VAE()
+    name = r'../models/'+str(modelname)+'.pt'
+    model.load_state_dict(torch.load(name))
+    return model
 
 

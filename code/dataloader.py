@@ -36,17 +36,17 @@ def get_dataloader_vae(dataset_name, train=True, batch_size=128):
 
     return train_loader, test_loader  # Returning both loaders
 
-def get_dataloader_OOD(dataset_name, ood_dataset_name, batch_size=128):
+def get_dataloader_OOD(ood_dataset_name, batch_size=128):
     # Normalisation
     normalize = transforms.Normalize((125.3 / 255, 123.0 / 255, 113.9 / 255), (63.0 / 255, 62.1 / 255, 66.7 / 255))
+    resize = transforms.Resize(size=(32,32)) # resizing to cifar10/100 size
     
     transform_test = transforms.Compose([
         transforms.ToTensor(),
+        resize,
         normalize
     ])
     
-    if dataset_name.lower() == ood_dataset_name.lower():
-        raise ValueError("The dataset should be different")
 
     # OOD Dataset
     if ood_dataset_name.lower() == 'cifar10':

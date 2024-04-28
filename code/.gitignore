@@ -1,2 +1,3 @@
-*LSUN*
-*data*
+data/
+
+__pycache__/
