@@ -1,1 +1,0 @@
-# file to code functions specific to method 1
