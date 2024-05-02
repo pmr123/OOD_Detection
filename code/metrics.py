@@ -31,7 +31,7 @@ class Metrics:
         scores = np.concatenate(scores, axis=0)
         return labels, scores
 
-    def plot_roc_curves(self):
+    def evaluation_metrics(self):
         labels, scores = self.evaluate()
         classes = np.unique(labels)
         y_bin = label_binarize(labels, classes=classes)
@@ -57,22 +57,7 @@ class Metrics:
             print(f"Class {key}: AUROC: {value['AUROC']:.2f}, AUPR: {value['AUPR']:.2f}, "
                   f"TPR at FPR 95%: {value['TPR_at_FPR95']}, with Threshold: {value['Threshold_at_FPR95']}")
 
-        # Plot all ROC curves
-        plt.figure()
-        colors = iter(['blue', 'red', 'green', 'yellow', 'purple', 'orange', 'cyan', 'magenta', 'brown', 'black'])
-        for i, class_ in enumerate(classes):
-            fpr, tpr, _ = roc_curve(y_bin[:, i], scores[:, i])
-            plt.plot(fpr, tpr, color=next(colors), lw=2, label=f'Class {class_} ROC curve (area = {metrics_dict[class_]["AUROC"]:.2f})')
-
-        plt.plot([0, 1], [0, 1], 'k--', lw=2)
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.05])
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title('Receiver operating characteristic for each class')
-        plt.legend(loc="lower right")
-        plt.show()
+       
 
 metrics = Metrics(model, data_loader, device)
-#metrics.plot_roc_curves()
-
+metrics.evaluation_metrics()
