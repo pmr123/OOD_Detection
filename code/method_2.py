@@ -38,7 +38,7 @@ def vae_loss(recon_x, x, mu, log_var):
     kl_div = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
     return recon_loss + kl_div
 
-def train_vae(model, data_loader, optimizer, epochs=10, device=torch.device('cpu')):
+def train_vae(model, data_loader, optimizer, epochs=150, device=torch.device('cpu')):
     model.train()
     for epoch in range(epochs):
         total_loss = 0
@@ -64,5 +64,4 @@ optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 from dataloader import get_dataloader_vae
 train_loader, _ = get_dataloader_vae('cifar10', batch_size=128)
 
-train_vae(model, train_loader, optimizer, epochs=10, device=device)
-# file to code functions specific to method 2
+train_vae(model, train_loader, optimizer, epochs=150, device=device)
