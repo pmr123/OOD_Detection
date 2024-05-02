@@ -74,5 +74,5 @@ class Metrics:
         plt.show()
 
 metrics = Metrics(model, data_loader, device)
-metrics.plot_roc_curves()
+#metrics.plot_roc_curves()
 
