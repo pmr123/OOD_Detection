@@ -1,83 +1,122 @@
 # import libraries
 import torch
 import numpy as np
-from utils import extract_feature_maps
+from sklearn.metrics import roc_curve, auc, precision_recall_curve
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+# set random seed
+np.random.seed(42)
+
 # class for energy-like ood detection
 class ELOOD:
-    def __init__(self, model, T=100):
+    def __init__(self, model):
+        # model
         self.model = model.to(device)
-        self.T = T
-    
-    
-    # reduce array from [batch, n, m, m] to [batch, n] using norm
-    # if array is already [batch, n] then return without change
-    def reduce_feats(self,feats):
-        if len(feats.shape) == 2:
-            return feats
+
+        # range threshold
+        self.thresholds_min = 0
+        self.thresholds_max = 1
+
+        # train ood scores
+        self.train_scores = []
         
-        output = np.zeros(shape=(feats.shape[0], feats.shape[1]))
-        
-        # get norms
-        for i in range(feats.shape[0]):
-            for j in range(feats.shape[1]):
-                output[i][j] = np.linalg.norm(feats[i][j])
-    
-        return output
-    
-    # get energy function values
-    # input size = [batch, n]
-    # output size = [batch]
-    def energy_vals(self, feats):
-        # Perform element-wise division by T
-        feats = np.divide(feats, self.T)      
-
-        # Get the exponential of all values in the tensor
-        feats = np.exp(feats)
-
-        # Compute row-wise sum
-        feats = np.sum(feats, axis=1)
-
-        # Perform element-wise multiplication by -T
-        feats = np.multiply(feats, (self.T))
-
-        return feats
-
+    # get reconstruction term of energy per sample
+    def get_recon_energy(self, output, input):
+        # Energy = sum( e^(|x[i] - f(x[i])|) ) 
+        result = torch.abs(output - input)
+        result = torch.exp(result)
+        result = torch.sum(result)
+        return result.item()
 
     # get ood scores 
     def get_scores(self, loader):
-        scores = []
+        ood_scores = []
         for i, (images, _) in enumerate(loader):
             images = images.to(device)
             
-            # get feature maps
-            feats = extract_feature_maps(self.model, images)
+            # get reconstructed, mu, logvar, latent space representation
+            reconstructed, mu, logvar, z = self.model(images)
 
-            # get latent space representation
-            _, _, _, z = self.model(images)
+            # get reconstruction term of energy
+            recon_energy = torch.zeros((images.shape[0]))
+            for i in range(images.shape[0]):
+                recon_energy[i] = self.get_recon_energy(reconstructed[i], images[i])
+            
+            # get penalty term of energy (KL divergence)
+            kld = torch.zeros((images.shape[0]))
+            for i in range(images.shape[0]):
+                kld[i] = - 0.5 * (1 + logvar[i] - mu[i].pow(2) - logvar[i].exp()).sum()
 
-            # append z to feats
-            feats.append(z.detach().cpu().data.numpy())
+            # add to get total energy
+            scores = recon_energy.cpu().data.numpy() + kld.cpu().data.numpy()
+            
+            ood_scores.extend(scores) 
+        
+        return ood_scores
+    
 
-            # reduce dims
-            feats = [self.reduce_feats(elem) for elem in feats]
+    # function to train thresholds for ood scores
+    def train_ood(self, train_dl):
+        # get scores
+        scores = self.get_scores(train_dl)
+        # update self variables
+        self.train_scores = scores
+        quartiles = np.quantile(scores, [0.25, 0.75])
+        self.thresholds_min = quartiles[0]
+        self.thresholds_max = quartiles[1]
+    
+    # predict if samples are in distribution or out distribution
+    def predict_ood(self, test_dl, already_scores = False):
+        # get scores
 
-            # get energy function scores
-            feats = [self.energy_vals(elem) for elem in feats]
+        if already_scores:
+            scores = test_dl
+        else:
+            scores = self.get_scores(test_dl)
 
-            # compute sum
-            total = np.zeros_like(feats[0])
-            for elem in feats:
-                total = np.add(total, elem)
+        # predict based on if scores are within range or not
+        preds = np.zeros_like(scores)
 
-            # get average
-            total = np.divide(total, len(feats))   
+        for i in range(len(scores)):
+            if self.thresholds_min <= scores[i] and scores[i] <= self.thresholds_max:
+                preds[i] = 0
+            else:
+                preds[i] = 1
 
-            # add scores to list
-            scores.extend(total)
+        return preds 
+    
+    # utility function to get metrics
+    def get_metrics(self, preds):
 
-        return scores
+        # choose preds.shape[0] random scores from in distribution samples
+        id_scores = np.random.choice(self.train_scores, size=preds.shape[0])
+
+        # get predictions on these scores
+        id_preds = self.predict_ood(id_scores, already_scores=True)
+
+        # get true labels
+        tl1 = np.zeros_like(preds)
+        tl2 = np.ones_like(preds)
+
+        # concatenate to get true labels and predictions
+        true_labels = np.append(tl1, tl2)
+        predictions = np.append(id_preds, preds)
+
+        # get metrics
+
+        # False Positive Rate when True Positive Rate = 95%
+        fpr, tpr, thresholds = roc_curve(true_labels, predictions)
+        false_positive_rate_95 = fpr[np.argmax(tpr >= 0.95)]
+
+        # AUPR (Area Under the Precision-Recall Curve)
+        precision, recall, _ = precision_recall_curve(true_labels, predictions)
+        aupr = auc(recall, precision)
+
+        # AUROC (Area Under the Receiver Operating Characteristic Curve)
+        fpr, tpr, _ = roc_curve(true_labels, predictions)
+        auroc = auc(fpr, tpr)
+
+        return(false_positive_rate_95, aupr, auroc)
     
